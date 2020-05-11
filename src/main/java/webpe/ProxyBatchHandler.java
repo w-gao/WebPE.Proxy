@@ -3,12 +3,10 @@ package webpe;
 import com.nukkitx.protocol.bedrock.BedrockPacket;
 import com.nukkitx.protocol.bedrock.BedrockSession;
 import com.nukkitx.protocol.bedrock.handler.BatchHandler;
-import com.nukkitx.protocol.bedrock.handler.BedrockPacketHandler;
+import com.nukkitx.protocol.bedrock.v389.Bedrock_v389;
 import io.netty.buffer.ByteBuf;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 
 public class ProxyBatchHandler implements BatchHandler {
 
@@ -21,30 +19,23 @@ public class ProxyBatchHandler implements BatchHandler {
         this.identifier = identifier;
     }
 
-    @Override
     public void handle(BedrockSession session, ByteBuf compressed, Collection<BedrockPacket> packets) {
 
-        System.out.println("batch!");
+        System.out.println("Received BatchPacket (0xfe) from Bedrock server...forwarding to WebSocket client.");
 
-
-        boolean wrapperHandled = false;
-        List<BedrockPacket> unhandled = new ArrayList<>();
-        for (BedrockPacket packet : packets) {
-
-            BedrockPacketHandler handler = session.getPacketHandler();
-
-            if (handler != null && packet.handle(handler)) {
-                wrapperHandled = true;
-            } else {
-                unhandled.add(packet);
-            }
+        System.out.println(packets.size());
+        if (packets.size() == 0) {
+            System.out.println("Received 0 packets!");
+            System.out.println(compressed.readableBytes());
+            System.out.println("---");
         }
 
-        if (!wrapperHandled) {
-            compressed.resetReaderIndex();
-            this.proxy.sendWrapped(this.identifier, compressed, true);
-        } else if (!unhandled.isEmpty()) {
-//            this.proxy.sendWrapped(unhandled, true);
-        }
+        ByteBuf bb = session.getCompressionHandler().compressPackets(Bedrock_v389.V389_CODEC, packets);
+
+        byte[] packet = new byte[bb.readableBytes() + 1];
+        packet[0] = (byte) 0xfe;   // batch packet
+        bb.readBytes(packet, 1, bb.readableBytes());
+
+        this.proxy.sendPacket(this.identifier, packet);
     }
 }

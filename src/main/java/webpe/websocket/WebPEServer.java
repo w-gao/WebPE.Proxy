@@ -179,6 +179,7 @@ public class WebPEServer extends WebSocketServer {
 //                ws.sendFragmentedFrame(Opcode.BINARY, ByteBuffer.wrap(fragmentedPackets[i]), i == fragmentedPackets.length - 1);
 //            }
 
+            System.out.println("[WebPE] sending " + payload.length + " bytes to " + identifier);
             ws.send(payload);
 
         } else {

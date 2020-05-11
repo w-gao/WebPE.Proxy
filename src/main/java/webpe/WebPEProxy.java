@@ -1,8 +1,8 @@
 package webpe;
 
 import com.nukkitx.protocol.bedrock.BedrockClient;
-import com.nukkitx.protocol.bedrock.v361.Bedrock_v361;
-import io.netty.buffer.ByteBuf;
+import com.nukkitx.protocol.bedrock.BedrockPacket;
+import com.nukkitx.protocol.bedrock.v389.Bedrock_v389;
 import io.netty.buffer.Unpooled;
 import webpe.websocket.WebPEServer;
 
@@ -41,22 +41,23 @@ public class WebPEProxy {
     public void openSession(String identifier, String address, int port, long clientID) {
 
         BedrockClient client = this.newClient();
-        client.connect(new InetSocketAddress("play.lbsg.net", 19132)).whenComplete((session, throwable) -> {
+        client.connect(new InetSocketAddress("0.0.0.0", 19132)).whenComplete((session, throwable) -> {
 
             if (throwable != null) {
-                System.err.println("Unable to connect to downstream server");
-                throwable.printStackTrace();
+                System.err.println("Unable to connect to downstream server: " + throwable.getMessage());
+//                throwable.printStackTrace();
                 return;
             }
 
-            session.setPacketCodec(Bedrock_v361.V361_CODEC);
-            session.setPacketHandler(new WebPEPacketHandler());
+            session.setPacketCodec(Bedrock_v389.V389_CODEC);
+            session.setPacketHandler(new WebPEPacketHandler(this, identifier));
             session.setBatchedHandler(new ProxyBatchHandler(this, identifier));
 
+//            session.sendPacket(ClientPacketFactory.randomLoginPacket());
 
             this.clients.put(identifier, client);
 
-            System.out.println(clientID + " connected! ");
+            System.out.println(clientID + " connected to Bedrock server.");
         });
     }
 
@@ -78,14 +79,17 @@ public class WebPEProxy {
      */
     public void handlePacket(String identifier, byte[] buffer) {
 
-        System.out.println("handlePacket!");
+        System.out.println(identifier + " handlePacket from WebSocket");
         if (this.clients.containsKey(identifier)) {
             BedrockClient client = this.clients.get(identifier);
 
             System.out.println(identifier + " --]-- packet: " + (buffer[0] & 0xff));
 
-//            client.getSession().sendPacket(Bedrock_v361.V361_CODEC.tryDecode(Unpooled.wrappedBuffer(buffer)));
-            client.getSession().sendWrapped(Unpooled.wrappedBuffer(buffer), false);
+            // todo: check for batch packet.
+
+            BedrockPacket pk = client.getSession().getPacketCodec().tryDecode(Unpooled.copiedBuffer(buffer));
+            System.out.println(pk);
+            client.getSession().sendPacket(pk);
         }
     }
 
@@ -93,19 +97,15 @@ public class WebPEProxy {
     /**
      * Calls when packet is received from BedrockClient. Forward to WebSocket
      */
-    public void sendWrapped(String identifier, ByteBuf packet, boolean encrypt) {
+    public void sendPacket(String identifier, byte[] packet) {
 
-        this.webSocketServer.sendPacket(identifier, packet.array());
+        this.webSocketServer.sendPacket(identifier, packet);
     }
-
-
-
 
 
     public BedrockClient newClient() {
         InetSocketAddress bindAddress = new InetSocketAddress("0.0.0.0", ThreadLocalRandom.current().nextInt(20000, 60000));
         BedrockClient client = new BedrockClient(bindAddress);
-//        this.clients.add(client);
         client.bind().join();
         return client;
     }
@@ -118,7 +118,11 @@ public class WebPEProxy {
             e.printStackTrace();
         }
 
-        // todo: remove clients
+        this.clients.forEach(((s, client) -> {
+            System.out.println("Closing Bedrock client: " + s);
+            client.close();
+        }));
+        this.clients.clear();
     }
 
 
