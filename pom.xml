@@ -96,7 +96,7 @@
     <dependencies>
         <dependency>
             <groupId>com.nukkitx.protocol</groupId>
-            <artifactId>bedrock-v389</artifactId>
+            <artifactId>bedrock-v390</artifactId>
             <version>2.5.5</version>
             <scope>compile</scope>
         </dependency>

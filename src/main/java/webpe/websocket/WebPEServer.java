@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 w-gao
+ * Copyright (c) 2019-2020 w-gao
  * All Rights Reserved.
  */
 
@@ -15,7 +15,6 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 
 /**
@@ -27,8 +26,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * @author William Gao
  */
 public class WebPEServer extends WebSocketServer {
-
-    protected static final byte[] MAGIC = { 0x12, 0x34, 0x56, 0x78 };
 
     protected final String ip;
     protected final int port;
@@ -69,12 +66,6 @@ public class WebPEServer extends WebSocketServer {
 
         System.out.println("[WebPE] " + conn.getRemoteSocketAddress().getAddress().getHostAddress() + " connected");
 
-
-        // move this to onMessage
-        // MAGIC + 0x01     -> UnconnectedPing
-        // MAGIC + 0x02     -> Connect
-
-        this.proxy.openSession(this.getIdentifier(conn), conn.getRemoteSocketAddress().getHostName(), conn.getRemoteSocketAddress().getPort(), 0);
         this.connections.put(this.getIdentifier(conn), conn);
     }
 
@@ -108,9 +99,11 @@ public class WebPEServer extends WebSocketServer {
      **/
     public void onMessage(WebSocket conn, String message) {
 
-        System.out.println("[WebPE] ??? Got a string message from conn" + ": " + message);
-    }
+        System.out.println("[WebPE] New ProxyMessage from " + this.getIdentifier(conn)
+                + ": " + message);
 
+        this.proxy.handlePacket(this.getIdentifier(conn), message);
+    }
 
     /**
      * Callback for binary messages received from the remote host
@@ -164,6 +157,17 @@ public class WebPEServer extends WebSocketServer {
     }
 
 
+    public void sendMessage(String identifier, String payload) {
+
+        WebSocket ws = this.connections.get(identifier);
+
+        if (ws != null) {
+            System.out.println("[WebPE] sending " + payload + " to " + identifier);
+            ws.send(payload);
+        } else {
+            System.out.println("[WebPE] sendPacket NULL identifier!");
+        }
+    }
 
     /**
      * Send a payload to the specific identifier connection

@@ -15,7 +15,7 @@ import com.nukkitx.math.vector.Vector3i;
 import com.nukkitx.protocol.bedrock.BedrockPacketCodec;
 import com.nukkitx.protocol.bedrock.packet.*;
 import com.nukkitx.protocol.bedrock.util.EncryptionUtils;
-import com.nukkitx.protocol.bedrock.v389.Bedrock_v389;
+import com.nukkitx.protocol.bedrock.v390.Bedrock_v390;
 import io.netty.util.AsciiString;
 import net.minidev.json.JSONObject;
 
@@ -27,7 +27,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class ClientPacketFactory {
 
-    public static final BedrockPacketCodec CODEC = Bedrock_v389.V389_CODEC;
+    public static final BedrockPacketCodec CODEC = Bedrock_v390.V390_CODEC;
 
     private static final ThreadLocalRandom rand = ThreadLocalRandom.current();
     private static final ObjectMapper jsonMapper = new ObjectMapper().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -84,14 +84,6 @@ public class ClientPacketFactory {
         return jws;
     }
 
-    private static Vector3i randomVector3i() {
-        return Vector3i.from(rand.nextInt(0xbf82a5), rand.nextInt(255), rand.nextInt(0xbf82a5));
-    }
-
-    private static Vector3f randomVector3f() {
-        return randomVector3i().toFloat();
-    }
-
     private static final List<String> langs = new ArrayList<String>() {
         {
             add("en_US");
@@ -126,10 +118,9 @@ public class ClientPacketFactory {
         }
     };
 
-    public static LoginPacket randomLoginPacket() {
-        String playerName = "wode" + (rand.nextInt() & 0x7fffffff);
+    public static LoginPacket randomLoginPacket(String playerName) {
         String svrAddr = "127.0.0.1:19132";
-        String mcVer = "1.11." + rand.nextInt(4);
+        String mcVer = "1.14." + rand.nextInt(4);
         String lang = langs.get(rand.nextInt(langs.size() - 1));
         String geometryName = "geometry.humanoid.custom";
         String skinGeometry = "_Custom";

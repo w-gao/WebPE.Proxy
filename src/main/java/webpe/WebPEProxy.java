@@ -2,8 +2,11 @@ package webpe;
 
 import com.nukkitx.protocol.bedrock.BedrockClient;
 import com.nukkitx.protocol.bedrock.BedrockPacket;
-import com.nukkitx.protocol.bedrock.v389.Bedrock_v389;
+import com.nukkitx.protocol.bedrock.v390.Bedrock_v390;
 import io.netty.buffer.Unpooled;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import webpe.network.ProxyPacketHandler;
 import webpe.websocket.WebPEServer;
 
 import java.io.BufferedReader;
@@ -22,42 +25,46 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class WebPEProxy {
 
-    private final AtomicBoolean running = new AtomicBoolean(true);
+    private static final Logger LOG = LoggerFactory.getLogger(WebPEProxy.class);
 
     private final WebPEServer webSocketServer;
+    private final ProxyPacketHandler proxyPacketHandler;
 
     private final Map<String, BedrockClient> clients = new ConcurrentHashMap<>();
 
+    private final AtomicBoolean running = new AtomicBoolean(true);
 
     public WebPEProxy() {
 
         webSocketServer = new WebPEServer(this, 19133);
-
+        proxyPacketHandler = new ProxyPacketHandler(this);
     }
 
     /**
-     * Calls when WebSocket connection establishes. Connects to a Bedrock server.
+     * Connect to a Bedrock server.
      */
-    public void openSession(String identifier, String address, int port, long clientID) {
+    public void openSession(String identifier, String host, int port) {
 
         BedrockClient client = this.newClient();
-        client.connect(new InetSocketAddress("0.0.0.0", 19132)).whenComplete((session, throwable) -> {
+        client.connect(new InetSocketAddress(host, port)).whenComplete((session, throwable) -> {
 
             if (throwable != null) {
                 System.err.println("Unable to connect to downstream server: " + throwable.getMessage());
-//                throwable.printStackTrace();
+                // throwable.printStackTrace();
+                // notify client that the connection failed
+                this.webSocketServer.sendMessage(identifier, "cRes;error;" + throwable.getMessage());
                 return;
             }
 
-            session.setPacketCodec(Bedrock_v389.V389_CODEC);
+            session.setPacketCodec(Bedrock_v390.V390_CODEC);
             session.setPacketHandler(new WebPEPacketHandler(this, identifier));
             session.setBatchedHandler(new ProxyBatchHandler(this, identifier));
 
-//            session.sendPacket(ClientPacketFactory.randomLoginPacket());
+            this.webSocketServer.sendMessage(identifier, "cRes;success");
 
             this.clients.put(identifier, client);
 
-            System.out.println(clientID + " connected to Bedrock server.");
+            System.out.println(identifier + " connected to Bedrock server.");
         });
     }
 
@@ -72,6 +79,19 @@ public class WebPEProxy {
             this.clients.remove(identifier);
             client.close();
         }
+    }
+
+    /**
+     * Calls when a ProxyMessage is received. Handle the message here.
+     */
+    public void handlePacket(String identifier, String data) {
+
+        BedrockClient client = null;
+        if (this.clients.containsKey(identifier)) {
+            client = this.clients.get(identifier);
+        }
+
+        this.proxyPacketHandler.handlePacket(identifier, client, data);
     }
 
     /**
@@ -119,7 +139,7 @@ public class WebPEProxy {
         }
 
         this.clients.forEach(((s, client) -> {
-            System.out.println("Closing Bedrock client: " + s);
+            LOG.info("Closing Bedrock client: " + s);
             client.close();
         }));
         this.clients.clear();
@@ -128,7 +148,7 @@ public class WebPEProxy {
 
     public static void main(String[] args) {
 
-        System.out.println(" - WebPeProxy 01 - ");
+        LOG.info(" - WebPeProxy 01 - ");
         WebPEProxy proxy = new WebPEProxy();
 
         try {
